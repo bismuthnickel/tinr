@@ -2,7 +2,8 @@
 #include <string>
 #include "stringtoint.hpp"
 
-int stringToInt(const std::string& str) {
+int
+stringToInt(const std::string& str) {
     if (str.empty()) {
         return 0;
     }

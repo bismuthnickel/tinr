@@ -2,4 +2,5 @@
 
 #include <string>
 
-int stringToInt(const std::string& str);
+int
+stringToInt(const std::string& str);
