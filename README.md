@@ -1,0 +1,1 @@
+requires `libncurses-dev` to build

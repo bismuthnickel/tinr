@@ -81,7 +81,8 @@ main(void)
 		":e - edit line",
 		":d - delete line",
 		":w - write",
-		":o! - open"
+		":o! - open",
+		":s - scrolling mode"
 	};
 
 	char* commandbuffer = (char*)malloc(1024);
@@ -114,6 +115,9 @@ main(void)
 
 	bool saved = false;
 
+	bool scrollingmode = false;
+	int scrolloffset = 0;
+
 	while (true)
 	{
 		if (buffer.size() == 0)
@@ -127,158 +131,202 @@ main(void)
 		{
 			int l;
 			int ml = row - 3;
-			for (l = 1;l < ml;l++) {
+			for (l = 1;l <= ml;l++) {
 				clearline(l);
 			}
 		}
 
 		{
-			int ln = 1;
+			int ln = 1 + scrolloffset;
 			int l = 1;
-			int cr = 1;
+			int currentrow = 1;
 			int _;
-			for (std::string line : buffer)
+			std::string line;
+			for (int l = 1;l <= row - 3 && l < buffer.size();l++)
 			{
+				line = buffer[ln - 1];
 				move(l,0);
 				attron(A_DIM);
 				printw("%d ", ln);
 				attroff(A_DIM);
 				printw("%s", line.data());
-				getyx(stdscr, cr, _);
-				l += cr - l + 1;
+				getyx(stdscr, currentrow, _);
+				l += currentrow - l;
 				ln++;
 			}
 		}
 
 		clearline(row - 1);
 		
-		getnstr(commandbuffer, 25);	
-
-		feedback = commandbuffer;
-
-		if (strbcmp(commandbuffer, ":q"))
+		if (scrollingmode)
 		{
-			if (!saved)
+			raw();
+			keypad(stdscr, true);
+			noecho();
+			int ch;
+			ch = getch();
+			if (ch == KEY_LEFT)
 			{
-				confirmation();
+				scrolloffset = 0;
 			}
-			break;
-		}
-		if (strbcmp(commandbuffer, ":q!"))
-		{
-			break;
-		}
-		if (strbcmp(commandbuffer, ":n"))
-		{
-			printfeedback((char*)"Enter line contents:");
-			clearline(row - 1);
-			getnstr(commandbuffer, 1024);
-			buffer.push_back(std::string(commandbuffer));
-			feedback = "Added 1 line";
-		}
-		if (strbcmp(commandbuffer, ":h"))
-		{
-			confirmation();
-			buffer = std::move(helpfile);
-			feedback = "Opened helpfile";
-		}
-		if (strbcmp(commandbuffer, ":x"))
-		{
-			confirmation();
-			buffer = std::move(emptyfile);
-			feedback = "I hope this is what you wanted.";
-		}
-		if (strbcmp(commandbuffer, ":d"))
-		{
-			printfeedback((char*)"Enter line number:");
-			clearline(row - 1);
-			getnstr(commandbuffer, 8);
-			buffer.erase(buffer.begin() + (stringToInt(commandbuffer) - 1));
-			feedback = "Removed 1 line";
-		}
-		if (strbcmp(commandbuffer, ":na"))
-		{
-			printfeedback((char*)"Enter line number:");
-			clearline(row - 1);
-			getnstr(commandbuffer, 8);
-			int ln = stringToInt(commandbuffer);
-			printfeedback((char*)"Enter line contents:");
-			clearline(row - 1);
-			getnstr(commandbuffer, 1024);
-			buffer.insert(buffer.begin() + (ln - 1), commandbuffer);
-			feedback = "Inserted 1 line";
-		}
-		if (strbcmp(commandbuffer, ":e"))
-		{
-			printfeedback((char*)"Enter line number:");
-			clearline(row - 1);
-			getnstr(commandbuffer, 8);
-			int ln = stringToInt(commandbuffer);
-			printfeedback((char*)"Enter line contents:");
-			clearline(row - 1);
-			getnstr(commandbuffer, 1024);
-			buffer[ln - 1] = commandbuffer;
-			feedback = "Changed 1 line";
-		}
-		if (strbcmp(commandbuffer, ":o!"))
-		{
-			printfeedback((char*)"Enter file name:");
-			clearline(row - 1);
-			getnstr(commandbuffer, 256);
-			currentFile = commandbuffer;
-
-			buffer = std::move(std::vector<std::string>());
-
-			std::ifstream file(commandbuffer);
-
-			if (!file.is_open())
+			if (ch == KEY_UP)
 			{
+				if (!(scrolloffset > 0))
+					goto cancel;
+				scrolloffset--;
+			}
+			if (ch == KEY_DOWN)
+			{
+				if (!(scrolloffset < buffer.size() - 1))
+					goto cancel;
+				scrolloffset++;
+			}
+			if (ch == KEY_RIGHT)
+			{
+				scrolloffset = buffer.size() - 1;
+			}
+			if (ch == ':')
+			{
+				scrollingmode = false;
+				feedback = "ok escape";
 				goto cancel;
 			}
-			
-			std::string line;
-
-			while (std::getline(file, line))
-			{
-        		buffer.push_back(line);
-    		}
-
-			file.close();
-
-			feedback = "Opened file";
+			echo();
+			keypad(stdscr, false);
+			noraw();
+			feedback = "Arrow keys to scroll. : to escape";
 		}
-		if (strbcmp(commandbuffer, ":w"))
+		else
 		{
-			if (currentFile.empty())
+			getnstr(commandbuffer, 25);	
+
+			feedback = commandbuffer;
+
+			if (strbcmp(commandbuffer, ":q"))
+			{
+				if (!saved)
+				{
+					confirmation();
+				}
+				break;
+			}
+			if (strbcmp(commandbuffer, ":q!"))
+			{
+				break;
+			}
+			if (strbcmp(commandbuffer, ":n"))
+			{
+				printfeedback((char*)"Enter line contents:");
+				clearline(row - 1);
+				getnstr(commandbuffer, 1024);
+				buffer.push_back(std::string(commandbuffer));
+				feedback = "Added 1 line";
+			}
+			if (strbcmp(commandbuffer, ":h"))
+			{
+				confirmation();
+				buffer = std::move(helpfile);
+				feedback = "Opened helpfile";
+			}
+			if (strbcmp(commandbuffer, ":x"))
+			{
+				confirmation();
+				buffer = std::move(emptyfile);
+				feedback = "I hope this is what you wanted.";
+			}
+			if (strbcmp(commandbuffer, ":d"))
+			{
+				printfeedback((char*)"Enter line number:");
+				clearline(row - 1);
+				getnstr(commandbuffer, 8);
+				buffer.erase(buffer.begin() + (stringToInt(commandbuffer) - 1));
+				feedback = "Removed 1 line";
+			}
+			if (strbcmp(commandbuffer, ":na"))
+			{
+				printfeedback((char*)"Enter line number:");
+				clearline(row - 1);
+				getnstr(commandbuffer, 8);
+				int ln = stringToInt(commandbuffer);
+				printfeedback((char*)"Enter line contents:");
+				clearline(row - 1);
+				getnstr(commandbuffer, 1024);
+				buffer.insert(buffer.begin() + (ln - 1), commandbuffer);
+				feedback = "Inserted 1 line";
+			}
+			if (strbcmp(commandbuffer, ":e"))
+			{
+				printfeedback((char*)"Enter line number:");
+				clearline(row - 1);
+				getnstr(commandbuffer, 8);
+				int ln = stringToInt(commandbuffer);
+				printfeedback((char*)"Enter line contents:");
+				clearline(row - 1);
+				getnstr(commandbuffer, 1024);
+				buffer[ln - 1] = commandbuffer;
+				feedback = "Changed 1 line";
+			}
+			if (strbcmp(commandbuffer, ":o!"))
 			{
 				printfeedback((char*)"Enter file name:");
 				clearline(row - 1);
 				getnstr(commandbuffer, 256);
 				currentFile = commandbuffer;
+
+				buffer = std::move(std::vector<std::string>());
+
+				std::ifstream file(commandbuffer);
+
+				if (!file.is_open())
+				{
+					goto cancel;
+				}
+				
+				std::string line;
+
+				while (std::getline(file, line))
+				{
+					buffer.push_back(line);
+				}
+
+				file.close();
+
+				feedback = "Opened file";
 			}
-			std::ofstream outputFile;
-
-			outputFile.open(currentFile);
-
-			if (!outputFile.is_open())
+			if (strbcmp(commandbuffer, ":w"))
 			{
-				feedback = "fate";
-				goto cancel;
-			}
+				if (currentFile.empty())
+				{
+					printfeedback((char*)"Enter file name:");
+					clearline(row - 1);
+					getnstr(commandbuffer, 256);
+					currentFile = commandbuffer;
+				}
+				std::ofstream outputFile;
 
-			for (std::string line : buffer)
+				outputFile.open(currentFile);
+
+				if (!outputFile.is_open())
+				{
+					feedback = "fate";
+					goto cancel;
+				}
+
+				for (std::string line : buffer)
+				{
+					outputFile << line << std::endl;
+				}
+
+				saved = true;
+				feedback = "Saved.";
+			}
+			if (strbcmp(commandbuffer,":s"))
 			{
-				outputFile << line << std::endl;
+				scrollingmode = true;
 			}
-
-			saved = true;
-			feedback = "Saved.";
 		}
 		
-		goto itsawrap;
 cancel:
-		feedback = "ok then";
-itsawrap:
 		printfeedback(feedback.data());
 
 		refresh();
