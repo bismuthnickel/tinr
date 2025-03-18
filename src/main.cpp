@@ -6,6 +6,7 @@
 #include <cmath>
 #include <utility>
 #include <fstream>
+#include "stuff.hpp"
 #include "stringtoint.hpp"
 #include "strbcmp.h"
 #include "center.h"
@@ -280,6 +281,7 @@ process_normal(void)
 int
 process_scrolling(void)
 {
+	printfeedback((char*)"Arrow keys to scroll, colon to escape");
 	raw();
 	keypad(stdscr, true);
 	noecho();
@@ -314,7 +316,6 @@ process_scrolling(void)
 		noraw();
 		return -2;
 	}
-	feedback = "Arrow keys to scroll. : to escape";
 	return 0;
 }
 
